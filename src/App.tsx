@@ -1,37 +1,12 @@
 import * as React from 'react';
 import { getters } from './apis';
-import { withApiSubscription } from './hocs/withApiSubscription';
-import { Commands, CommandCompProps } from './components/Commands';
-import { Parents, ParentHocProps } from './components/Parents';
-import { CommandAndParent, CommandAndParentCompProps } from './components/CommandAndParent';
-import { FetcherConfig } from './hocs/withApiSubscription.js';
-
-// PARENT COMPONENT WITH FETCH --------------------------------------------------
-const parentSubscription: FetcherConfig<ParentHocProps, number> = {
-  name: 'parents',
-  fetcher: (routeParams, props) => getters.fetchEntityParents(props.someFetchDependency!),
-  triggers: ['updateEntityCommands', 'updateEntityParents'],
-  waitFor: ['someFetchDependency']
-};
-const ParentWithSub = withApiSubscription(Parents, [parentSubscription]);
-
-// COMMAND COMPONENT WITH FETCH --------------------------------------------------
-const commandSubscription: FetcherConfig<CommandCompProps, number> = {
-  name: 'commands',
-  fetcher: () => getters.fetchEntityCommands(),
-  triggers: ['updateEntityCommands']
-};
-
-const CommandsWithSub = withApiSubscription(Commands, [commandSubscription]);
-
-// COMMAND AND PARENT COMPONENT --------------------------------------------------
-const CommandAndParentWithSub = withApiSubscription<CommandAndParentCompProps>(CommandAndParent, [
-  parentSubscription,
-  commandSubscription
-]);
+import { Commands } from './components/Commands';
+import { Parents } from './components/Parents';
+import { CommandAndParent } from './components/CommandAndParent';
+import { ApiSubscription } from './components/ApiSubscription';
 
 // APP COMPONENT -----------------------------------------------------------------
-export class App extends React.Component<{}, { someFetchDependency?: boolean }> {
+export class App extends React.Component<{}, { someFetchDependency?: boolean }> {  
   constructor(props: {}) {
     super(props);
     this.state = { someFetchDependency: undefined };
@@ -48,16 +23,42 @@ export class App extends React.Component<{}, { someFetchDependency?: boolean }> 
       <div className="App">
         <h1>Api Refactoring Demo</h1>
         <hr />
-        <CommandAndParentWithSub
-          someFetchDependency={this.state.someFetchDependency}
-        />
+        <ApiSubscription<number>
+          apiGetter={getters.fetchEntityCommands}
+          subscribeTo={['updateEntityParents', 'updateEntityCommands']}
+        >
+          {(commands) => (
+            <ApiSubscription<number>
+              waitingForDependencies={!this.state.someFetchDependency}
+              apiGetter={() => getters.fetchEntityParents(this.state.someFetchDependency!)}
+              subscribeTo={['updateEntityParents', 'updateEntityCommands']}
+            >
+              {(parents) => (
+                <CommandAndParent
+                  parentsError={parents.error}
+                  parents={parents.data}
+                  commandsError={commands.error}
+                  commands={commands.data}
+                />
+              )}
+            </ApiSubscription>
+          )}
+        </ApiSubscription>
         <hr />
-        <CommandsWithSub />
+        <ApiSubscription<number>
+          apiGetter={getters.fetchEntityCommands}
+          subscribeTo={['updateEntityCommands']}
+        >
+          {(subState) => <Commands {...subState} />}
+        </ApiSubscription>
         <hr />
-        <ParentWithSub
-          color="teal" // Passing other props is still possible
-          someFetchDependency={this.state.someFetchDependency}
-        />
+        <ApiSubscription<number>
+          waitingForDependencies={!this.state.someFetchDependency}
+          apiGetter={() => getters.fetchEntityParents(this.state.someFetchDependency!)}
+          subscribeTo={['updateEntityParents', 'updateEntityCommands']}
+        >
+          {(subState) => <Parents color="teal" {...subState} />}
+        </ApiSubscription>
         <hr />
       </div>
     );

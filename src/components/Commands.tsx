@@ -1,48 +1,30 @@
 import * as React from 'react';
 import { setters } from '../apis';
 
-/**
- * Parents that will be added by the HOC.
- * They need to be a separate interface, util typescript
- * is able to use computed interface keys.
- */
-export interface CommandApiProps {
-  commandsError: null | Error;
-  commandsLoading: boolean;
-  commands: number;
-}
-
-/** All props, that will not be provied by the HOC  */
-export interface CommandCompProps {
+export interface CommandProps {
+  error: null | Error;
+  data: number | undefined;
   color?: string;
 }
 
-/**
- * This interface is used to add additional props to the HOC, which
- * are not part of the actual component.
- * Usually these are dependencies that are used for fetching in the HOC.
- */
-type CommandProps = CommandApiProps & CommandCompProps;
-
 export function Commands(props: CommandProps) {
   const msg =
-    (props.commandsError && 'Commands: Error') ||
-    (props.commandsLoading && 'Commands: Loading') ||
-    (props.commands !== undefined && `Commands: ${props.commands}`) ||
-    'Error while loading commands due to missing props';
+    (props.error && 'Commands: Error') ||
+    (props.data !== undefined && `Commands: ${props.data}`) ||
+    'Loading';
 
   const color =
-    (props.commandsError && 'red') ||
-    (props.commandsLoading && 'orange') ||
+    (props.error && 'red') ||
+    (props.data === undefined && 'orange') ||
     props.color ||
     'black';
 
-  const buttonEnabled = props.commandsError || props.commandsLoading;
+  const buttonDisabled = !!(props.error || props.data === undefined);
 
   return (
     <>
       <pre style={{ color }}>{msg}</pre>
-      <button onClick={setters.updateEntityCommands} disabled={!!buttonEnabled}>
+      <button onClick={setters.updateEntityCommands} disabled={buttonDisabled}>
         Add command and update parents
       </button>
     </>
