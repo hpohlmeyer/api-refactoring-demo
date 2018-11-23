@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { triggerManager } from '../state/triggerManager';
 import { ApiSetterName } from '../apis';
+import { CancelablePromise, makeCancelable } from '../utils/makeCancelable';
 
 interface ApiSubscriptionState<T> {
   /** An error that may get thrown during the apiGetter call. Otherwise it is `null` */
@@ -26,10 +27,12 @@ interface ApiSubscriptionProps<T> {
  */
 export class ApiSubscription<T> extends React.Component<ApiSubscriptionProps<T>, ApiSubscriptionState<T>> {
   public subscriptionId: string;
+  public getterPromise: CancelablePromise<T> | null;
   
   constructor(props: ApiSubscriptionProps<T>) {
     super(props);
     this.subscriptionId = Math.random().toString(36).substr(2, 10);
+    this.getterPromise = null;
     this.state = {
       error: null,
       data: undefined
@@ -46,10 +49,13 @@ export class ApiSubscription<T> extends React.Component<ApiSubscriptionProps<T>,
       if (!isInitialLoad) {
         this.setState({ data: undefined });
       }
-      const data = await this.props.apiGetter();
+      this.getterPromise = makeCancelable(this.props.apiGetter());
+      const data = await this.getterPromise.promise;
       this.setState({ data });
     } catch (error) {
       this.setState({ error });
+    } finally {
+      this.getterPromise = null;
     }
   }
 
@@ -71,6 +77,10 @@ export class ApiSubscription<T> extends React.Component<ApiSubscriptionProps<T>,
   }
 
   public componentWillUnmount(): void {
+    if (this.getterPromise) {
+      this.getterPromise.cancel();
+    }
+
     (this.props.subscribeTo || []).forEach(trigger =>
       triggerManager.removeTrigger(trigger, this.subscriptionId)
     );
